@@ -95,11 +95,9 @@ export class Web3ProviderBackend extends EventEmitter implements IWeb3Provider {
         return this.waitAuthorization(
           { method, params },
           async () => {
-            const { chainId } = this.getCurrentChain()
-            this.emit('connect', { chainId })
-            return Promise.all(
-              this.#wallets.map((wallet) => wallet.getAddress())
-            )
+            const accounts = await Promise.all(this.#wallets.map((wallet) => wallet.getAddress()))
+            this.emit('accountsChanged', accounts)
+            return accounts
           },
           true,
           'eth_requestAccounts'
