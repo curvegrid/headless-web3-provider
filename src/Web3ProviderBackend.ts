@@ -90,8 +90,7 @@ export class Web3ProviderBackend extends EventEmitter implements IWeb3Provider {
       case 'eth_getTransactionReceipt':
         return this.getRpc().send(method, params)
 
-      case 'eth_requestAccounts':
-      case 'eth_accounts':
+      case 'eth_requestAccounts': {
         return this.waitAuthorization(
           { method, params },
           async () => {
@@ -99,9 +98,16 @@ export class Web3ProviderBackend extends EventEmitter implements IWeb3Provider {
             this.emit('accountsChanged', accounts)
             return accounts
           },
-          true,
-          'eth_requestAccounts'
+          true
         )
+      }
+
+      case 'eth_accounts': {
+        if (this._authorizedRequests['eth_requestAccounts']) {
+          return await Promise.all(this.#wallets.map((wallet) => wallet.getAddress()))
+        }
+        return []
+      }
 
       case 'eth_chainId': {
         const { chainId } = this.getCurrentChain()
@@ -218,11 +224,8 @@ export class Web3ProviderBackend extends EventEmitter implements IWeb3Provider {
     requestInfo: PendingRequest['requestInfo'],
     task: () => Promise<T>,
     permanentPermission = false,
-    methodOverride?: string
   ) {
-    const method = methodOverride ?? requestInfo.method
-
-    if (this._authorizedRequests[method]) {
+    if (this._authorizedRequests[requestInfo.method]) {
       return task()
     }
 
@@ -231,7 +234,7 @@ export class Web3ProviderBackend extends EventEmitter implements IWeb3Provider {
         requestInfo: requestInfo,
         authorize: async () => {
           if (permanentPermission) {
-            this._authorizedRequests[method] = true
+            this._authorizedRequests[requestInfo.method] = true
           }
 
           resolve(await task())
